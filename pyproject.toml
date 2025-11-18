@@ -7,14 +7,17 @@ build-backend = "hatchling.build"
 [project]
 name = "tu"
 version = "0.0.1"
-description = "I Command -- quick access to your favorite scripts"
+description = "Terminal Utils - unified entry point for scripts and commands"
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = []
+keywords = ["cli", "terminal", "scripts", "commands", "productivity"]
 authors = [
     { name = "Thor Whalen" },
 ]
 dependencies = []
+
+[project.scripts]
+tu = "tu.cli:main"
 
 [project.license]
 text = "mit"
