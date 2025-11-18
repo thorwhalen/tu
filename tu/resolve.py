@@ -122,8 +122,10 @@ def infer_default_name(target: str, command_type: CommandType) -> str:
 def resolve_command(name: str) -> tuple[Optional[RegisteredCommand], bool]:
     """Resolve a command name to a RegisteredCommand.
 
+    Supports resolving by command name or alias.
+
     Args:
-        name: Command name to resolve.
+        name: Command name or alias to resolve.
 
     Returns:
         Tuple of (RegisteredCommand or None, is_dotted_fallback).
@@ -131,10 +133,16 @@ def resolve_command(name: str) -> tuple[Optional[RegisteredCommand], bool]:
         If using dotted-name rule: (None, True)
         If not found: (None, False)
     """
-    # First, try to find in registry
+    # First, try to find in registry by name
     command = get_command(name)
     if command is not None:
         return (command, False)
+
+    # Try to find by alias
+    all_commands = list_commands()
+    for cmd in all_commands:
+        if name in cmd.aliases:
+            return (cmd, False)
 
     # If not found and contains a dot, use dotted-name rule
     if is_dotted_name(name):

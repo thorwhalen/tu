@@ -15,7 +15,7 @@ from .models import CommandType, RegisteredCommand
 
 
 def get_registry_path() -> Path:
-    """Get the path to the registry file.
+    """Get the path to the global registry file.
 
     Returns:
         Path to the registry JSON file, either from environment variable
@@ -28,6 +28,27 @@ def get_registry_path() -> Path:
     # Default: ~/.config/tu/registered_scripts.json
     config_dir = Path.home() / ".config" / "tu"
     return config_dir / "registered_scripts.json"
+
+
+def get_project_registry_path() -> Optional[Path]:
+    """Get the path to a project-local registry if it exists.
+
+    Searches up the directory tree from the current working directory
+    for a .tu/registry.json file.
+
+    Returns:
+        Path to project registry if found, None otherwise.
+    """
+    current = Path.cwd()
+
+    # Search up to root
+    while current != current.parent:
+        project_registry = current / ".tu" / "registry.json"
+        if project_registry.exists():
+            return project_registry
+        current = current.parent
+
+    return None
 
 
 def load_registry(path: Optional[Path] = None) -> dict[str, RegisteredCommand]:
@@ -77,6 +98,32 @@ def load_registry(path: Optional[Path] = None) -> dict[str, RegisteredCommand]:
             f"Failed to load registry: {e}. "
             "Please check your registry file."
         )
+
+
+def load_layered_registry() -> dict[str, RegisteredCommand]:
+    """Load registry with project-local commands layered over global commands.
+
+    Project-local commands (from .tu/registry.json) take precedence over
+    global commands when there are naming conflicts.
+
+    Returns:
+        Dictionary mapping command names to RegisteredCommand objects.
+    """
+    # Load global registry
+    global_commands = load_registry()
+
+    # Load project-local registry if it exists
+    project_path = get_project_registry_path()
+    if project_path is None:
+        return global_commands
+
+    project_commands = load_registry(project_path)
+
+    # Merge: project commands override global
+    result = global_commands.copy()
+    result.update(project_commands)
+
+    return result
 
 
 def save_registry(

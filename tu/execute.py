@@ -1,8 +1,10 @@
 """Command execution for tu."""
 
 import importlib
+import os
 import subprocess
 import sys
+import time
 from typing import Optional
 
 from .exceptions import CommandExecutionError
@@ -14,7 +16,10 @@ def execute_shell(
     args: list[str],
     cwd: Optional[str] = None,
     env: Optional[dict[str, str]] = None,
-    capture_output: bool = False
+    capture_output: bool = False,
+    timeout: Optional[int] = None,
+    dry_run: bool = False,
+    verbose: bool = False
 ) -> RunResult:
     """Execute a shell command.
 
@@ -24,6 +29,9 @@ def execute_shell(
         cwd: Working directory for execution.
         env: Environment variables.
         capture_output: Whether to capture stdout/stderr.
+        timeout: Timeout in seconds.
+        dry_run: If True, show what would execute without running.
+        verbose: If True, show detailed execution information.
 
     Returns:
         RunResult with execution results.
@@ -31,38 +39,68 @@ def execute_shell(
     Raises:
         CommandExecutionError: If execution fails.
     """
+    # Build the full command
+    if " " in target:
+        # Shell command with arguments
+        cmd_str = f"{target} {' '.join(args)}" if args else target
+        cmd_for_display = cmd_str
+        use_shell = True
+        cmd_for_exec = cmd_str
+    else:
+        # Simple command or path
+        cmd_for_exec = [target] + args
+        cmd_for_display = " ".join([target] + args)
+        use_shell = False
+
+    if dry_run:
+        print(f"[DRY RUN] Would execute: {cmd_for_display}")
+        if cwd:
+            print(f"[DRY RUN]   Working directory: {cwd}")
+        if env:
+            print(f"[DRY RUN]   Environment variables: {env}")
+        if timeout:
+            print(f"[DRY RUN]   Timeout: {timeout}s")
+        return RunResult(returncode=0, duration=0.0)
+
+    if verbose:
+        print(f"[VERBOSE] Executing: {cmd_for_display}")
+        if cwd:
+            print(f"[VERBOSE]   Working directory: {cwd}")
+        if env:
+            print(f"[VERBOSE]   Environment variables: {env}")
+        if timeout:
+            print(f"[VERBOSE]   Timeout: {timeout}s")
+
     try:
-        # Build the full command
-        # If target contains spaces, treat it as a complete command
-        if " " in target:
-            # Shell command with arguments
-            cmd = f"{target} {' '.join(args)}" if args else target
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=cwd,
-                env=env,
-                capture_output=capture_output,
-                text=True
-            )
-        else:
-            # Simple command or path
-            cmd = [target] + args
-            result = subprocess.run(
-                cmd,
-                shell=False,
-                cwd=cwd,
-                env=env,
-                capture_output=capture_output,
-                text=True
-            )
+        start_time = time.time()
+
+        result = subprocess.run(
+            cmd_for_exec,
+            shell=use_shell,
+            cwd=cwd,
+            env=env,
+            capture_output=capture_output,
+            text=True,
+            timeout=timeout
+        )
+
+        duration = time.time() - start_time
+
+        if verbose:
+            print(f"[VERBOSE] Completed in {duration:.2f}s with exit code {result.returncode}")
 
         return RunResult(
             returncode=result.returncode,
             stdout=result.stdout if capture_output else None,
-            stderr=result.stderr if capture_output else None
+            stderr=result.stderr if capture_output else None,
+            duration=duration
         )
 
+    except subprocess.TimeoutExpired:
+        duration = time.time() - start_time
+        raise CommandExecutionError(
+            f"Command timed out after {timeout}s: {cmd_for_display}"
+        )
     except FileNotFoundError:
         raise CommandExecutionError(
             f"Command not found: {target}"
@@ -78,7 +116,10 @@ def execute_python_module(
     args: list[str],
     cwd: Optional[str] = None,
     env: Optional[dict[str, str]] = None,
-    capture_output: bool = False
+    capture_output: bool = False,
+    timeout: Optional[int] = None,
+    dry_run: bool = False,
+    verbose: bool = False
 ) -> RunResult:
     """Execute a Python module using python -m.
 
@@ -88,6 +129,9 @@ def execute_python_module(
         cwd: Working directory for execution.
         env: Environment variables.
         capture_output: Whether to capture stdout/stderr.
+        timeout: Timeout in seconds.
+        dry_run: If True, show what would execute without running.
+        verbose: If True, show detailed execution information.
 
     Returns:
         RunResult with execution results.
@@ -95,22 +139,57 @@ def execute_python_module(
     Raises:
         CommandExecutionError: If execution fails.
     """
+    cmd = [sys.executable, "-m", module] + args
+    cmd_for_display = " ".join(cmd)
+
+    if dry_run:
+        print(f"[DRY RUN] Would execute: {cmd_for_display}")
+        if cwd:
+            print(f"[DRY RUN]   Working directory: {cwd}")
+        if env:
+            print(f"[DRY RUN]   Environment variables: {env}")
+        if timeout:
+            print(f"[DRY RUN]   Timeout: {timeout}s")
+        return RunResult(returncode=0, duration=0.0)
+
+    if verbose:
+        print(f"[VERBOSE] Executing: {cmd_for_display}")
+        if cwd:
+            print(f"[VERBOSE]   Working directory: {cwd}")
+        if env:
+            print(f"[VERBOSE]   Environment variables: {env}")
+        if timeout:
+            print(f"[VERBOSE]   Timeout: {timeout}s")
+
     try:
-        cmd = [sys.executable, "-m", module] + args
+        start_time = time.time()
+
         result = subprocess.run(
             cmd,
             cwd=cwd,
             env=env,
             capture_output=capture_output,
-            text=True
+            text=True,
+            timeout=timeout
         )
+
+        duration = time.time() - start_time
+
+        if verbose:
+            print(f"[VERBOSE] Completed in {duration:.2f}s with exit code {result.returncode}")
 
         return RunResult(
             returncode=result.returncode,
             stdout=result.stdout if capture_output else None,
-            stderr=result.stderr if capture_output else None
+            stderr=result.stderr if capture_output else None,
+            duration=duration
         )
 
+    except subprocess.TimeoutExpired:
+        duration = time.time() - start_time
+        raise CommandExecutionError(
+            f"Command timed out after {timeout}s: {cmd_for_display}"
+        )
     except Exception as e:
         raise CommandExecutionError(
             f"Failed to execute Python module '{module}': {e}"
@@ -122,7 +201,10 @@ def execute_python_callable(
     args: list[str],
     cwd: Optional[str] = None,
     env: Optional[dict[str, str]] = None,
-    capture_output: bool = False
+    capture_output: bool = False,
+    timeout: Optional[int] = None,
+    dry_run: bool = False,
+    verbose: bool = False
 ) -> RunResult:
     """Execute a Python callable.
 
@@ -132,6 +214,9 @@ def execute_python_callable(
         cwd: Working directory (changes sys.path and os.cwd if provided).
         env: Environment variables (updates os.environ if provided).
         capture_output: Whether to capture stdout/stderr.
+        timeout: Timeout in seconds (not supported for callables).
+        dry_run: If True, show what would execute without running.
+        verbose: If True, show detailed execution information.
 
     Returns:
         RunResult with execution results.
@@ -139,16 +224,30 @@ def execute_python_callable(
     Raises:
         CommandExecutionError: If execution fails.
     """
+    if ":" not in target:
+        raise CommandExecutionError(
+            f"Invalid callable target '{target}'. "
+            "Expected format: module:function"
+        )
+
+    module_path, function_name = target.rsplit(":", 1)
+
+    if dry_run:
+        print(f"[DRY RUN] Would execute: {target}({args})")
+        if cwd:
+            print(f"[DRY RUN]   Working directory: {cwd}")
+        if env:
+            print(f"[DRY RUN]   Environment variables: {env}")
+        return RunResult(returncode=0, duration=0.0)
+
+    if verbose:
+        print(f"[VERBOSE] Executing: {target}({args})")
+        if cwd:
+            print(f"[VERBOSE]   Working directory: {cwd}")
+        if env:
+            print(f"[VERBOSE]   Environment variables: {env}")
+
     try:
-        # Parse module:function
-        if ":" not in target:
-            raise CommandExecutionError(
-                f"Invalid callable target '{target}'. "
-                "Expected format: module:function"
-            )
-
-        module_path, function_name = target.rsplit(":", 1)
-
         # Import the module
         try:
             module = importlib.import_module(module_path)
@@ -171,7 +270,6 @@ def execute_python_callable(
             )
 
         # Handle cwd and env if needed
-        import os
         old_cwd = None
         old_env = {}
 
@@ -186,6 +284,8 @@ def execute_python_callable(
                 os.environ[key] = value
 
         try:
+            start_time = time.time()
+
             # Capture output if requested
             if capture_output:
                 import io
@@ -204,6 +304,8 @@ def execute_python_callable(
                 stdout_str = None
                 stderr_str = None
 
+            duration = time.time() - start_time
+
             # Interpret result as return code
             if result is None:
                 returncode = 0
@@ -212,10 +314,14 @@ def execute_python_callable(
             else:
                 returncode = 0  # Treat non-integer returns as success
 
+            if verbose:
+                print(f"[VERBOSE] Completed in {duration:.2f}s with exit code {returncode}")
+
             return RunResult(
                 returncode=returncode,
                 stdout=stdout_str,
-                stderr=stderr_str
+                stderr=stderr_str,
+                duration=duration
             )
 
         finally:
@@ -255,7 +361,10 @@ def execute_plan(plan: ExecutionPlan, capture_output: bool = False) -> RunResult
             plan.args,
             cwd=plan.cwd,
             env=plan.env,
-            capture_output=capture_output
+            capture_output=capture_output,
+            timeout=plan.timeout,
+            dry_run=plan.dry_run,
+            verbose=plan.verbose
         )
     elif plan.command_type == "python_module":
         return execute_python_module(
@@ -263,7 +372,10 @@ def execute_plan(plan: ExecutionPlan, capture_output: bool = False) -> RunResult
             plan.args,
             cwd=plan.cwd,
             env=plan.env,
-            capture_output=capture_output
+            capture_output=capture_output,
+            timeout=plan.timeout,
+            dry_run=plan.dry_run,
+            verbose=plan.verbose
         )
     elif plan.command_type == "python_callable":
         return execute_python_callable(
@@ -271,7 +383,10 @@ def execute_plan(plan: ExecutionPlan, capture_output: bool = False) -> RunResult
             plan.args,
             cwd=plan.cwd,
             env=plan.env,
-            capture_output=capture_output
+            capture_output=capture_output,
+            timeout=plan.timeout,
+            dry_run=plan.dry_run,
+            verbose=plan.verbose
         )
     else:
         raise CommandExecutionError(

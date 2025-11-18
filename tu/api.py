@@ -1,15 +1,20 @@
 """Python API for tu package."""
 
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from .exceptions import InvalidNameError, UnknownCommandError
 from .execute import execute_plan
-from .models import CommandType, ExecutionPlan, RegisteredCommand, RunResult
+from .history import add_history_entry
+from .log import write_log
+from .models import CommandType, ExecutionPlan, HistoryEntry, RegisteredCommand, RunResult
 from .registry import (
     add_command as _add_command,
     get_command,
     list_commands as _list_commands,
+    load_layered_registry,
     remove_command,
     rename_command as _rename_command,
 )
@@ -23,28 +28,50 @@ from .resolve import (
 )
 
 
-def list_commands(pattern: Optional[str] = None) -> list[RegisteredCommand]:
+def list_commands(pattern: Optional[str] = None, use_layered: bool = True) -> list[RegisteredCommand]:
     """List all registered commands.
 
     Args:
         pattern: Optional pattern to filter command names (substring match).
+        use_layered: If True, include project-local commands.
 
     Returns:
         List of RegisteredCommand objects.
     """
-    return _list_commands(pattern=pattern)
+    if use_layered:
+        # Load layered registry (project + global)
+        commands_dict = load_layered_registry()
+        commands = list(commands_dict.values())
+
+        if pattern is None:
+            return sorted(commands, key=lambda c: c.name)
+
+        # Filter by pattern
+        pattern_lower = pattern.lower()
+        return sorted(
+            [c for c in commands if pattern_lower in c.name.lower()],
+            key=lambda c: c.name
+        )
+    else:
+        return _list_commands(pattern=pattern)
 
 
-def get_command_info(name: str) -> Optional[RegisteredCommand]:
+def get_command_info(name: str, use_layered: bool = True) -> Optional[RegisteredCommand]:
     """Get information about a registered command.
 
     Args:
-        name: Command name.
+        name: Command name or alias.
+        use_layered: If True, search project-local registry too.
 
     Returns:
         RegisteredCommand if found, None otherwise.
     """
-    return get_command(name)
+    if use_layered:
+        # Try to resolve using layered registry
+        command, _ = resolve_command(name)
+        return command
+    else:
+        return get_command(name)
 
 
 def register_command(
@@ -54,6 +81,10 @@ def register_command(
     type: Optional[str] = None,
     description: Optional[str] = None,
     tags: Optional[list[str]] = None,
+    aliases: Optional[list[str]] = None,
+    depends_on: Optional[list[str]] = None,
+    env: Optional[dict[str, str]] = None,
+    timeout: Optional[int] = None,
     allow_dot_name: bool = False
 ) -> RegisteredCommand:
     """Register a new command.
@@ -64,6 +95,10 @@ def register_command(
         type: Command type (shell, python_module, python_callable). If None, inferred.
         description: Optional description.
         tags: Optional list of tags.
+        aliases: Optional list of alternative names.
+        depends_on: Optional list of commands this depends on.
+        env: Optional environment variables to set.
+        timeout: Optional timeout in seconds.
         allow_dot_name: Allow registering names with dots without confirmation.
 
     Returns:
@@ -105,6 +140,10 @@ def register_command(
         target=target,
         description=description,
         tags=tags or [],
+        aliases=aliases or [],
+        depends_on=depends_on or [],
+        env=env or {},
+        timeout=timeout,
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
@@ -150,7 +189,13 @@ def run(
     name: str,
     args: Optional[list[str]] = None,
     *,
-    capture_output: bool = False
+    capture_output: bool = False,
+    dry_run: bool = False,
+    verbose: bool = False,
+    timeout_override: Optional[int] = None,
+    log_output: bool = False,
+    log_dir: Optional[Path] = None,
+    track_history: bool = True
 ) -> RunResult:
     """Run a command.
 
@@ -158,6 +203,12 @@ def run(
         name: Command name to run.
         args: Arguments to pass to the command.
         capture_output: Whether to capture stdout/stderr.
+        dry_run: If True, show what would execute without running.
+        verbose: If True, show detailed execution information.
+        timeout_override: Override the command's timeout setting.
+        log_output: If True, write output to log file.
+        log_dir: Optional directory for log files.
+        track_history: If True, add to command history.
 
     Returns:
         RunResult with execution results.
@@ -173,22 +224,88 @@ def run(
     command, is_dotted = resolve_command(name)
 
     if command is not None:
-        # Execute registered command
+        # Handle dependencies
+        if command.depends_on and not dry_run:
+            if verbose:
+                print(f"[VERBOSE] Running dependencies: {', '.join(command.depends_on)}")
+            for dep in command.depends_on:
+                dep_result = run(dep, verbose=verbose, track_history=False)
+                if dep_result.returncode != 0:
+                    raise UnknownCommandError(
+                        f"Dependency '{dep}' failed with exit code {dep_result.returncode}"
+                    )
+
+        # Build execution plan
+        timeout = timeout_override if timeout_override is not None else command.timeout
+
+        # Merge command env with current env
+        merged_env = dict(os.environ)
+        if command.env:
+            merged_env.update(command.env)
+
         plan = ExecutionPlan(
             command_type=command.type,
             target=command.target,
-            args=args
+            args=args,
+            env=merged_env if command.env else None,
+            timeout=timeout,
+            dry_run=dry_run,
+            verbose=verbose
         )
-        return execute_plan(plan, capture_output=capture_output)
+
+        result = execute_plan(plan, capture_output=capture_output or log_output)
+
+        # Log output if requested
+        if log_output and not dry_run:
+            log_file = write_log(command.name, result, args, log_dir)
+            if verbose:
+                print(f"[VERBOSE] Output logged to: {log_file}")
+
+        # Track history if requested
+        if track_history and not dry_run:
+            entry = HistoryEntry(
+                command_name=command.name,
+                args=args,
+                returncode=result.returncode,
+                executed_at=datetime.now(),
+                duration=result.duration or 0.0,
+                cwd=os.getcwd()
+            )
+            add_history_entry(entry)
+
+        return result
 
     elif is_dotted:
         # Execute dotted name as Python module
         plan = ExecutionPlan(
             command_type="python_module",
             target=name,
-            args=args
+            args=args,
+            dry_run=dry_run,
+            verbose=verbose
         )
-        return execute_plan(plan, capture_output=capture_output)
+
+        result = execute_plan(plan, capture_output=capture_output or log_output)
+
+        # Log output if requested
+        if log_output and not dry_run:
+            log_file = write_log(name, result, args, log_dir)
+            if verbose:
+                print(f"[VERBOSE] Output logged to: {log_file}")
+
+        # Track history if requested
+        if track_history and not dry_run:
+            entry = HistoryEntry(
+                command_name=name,
+                args=args,
+                returncode=result.returncode,
+                executed_at=datetime.now(),
+                duration=result.duration or 0.0,
+                cwd=os.getcwd()
+            )
+            add_history_entry(entry)
+
+        return result
 
     else:
         # Not found - suggest alternatives
