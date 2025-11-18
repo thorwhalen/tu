@@ -20,7 +20,7 @@ from .exceptions import (
     TuError,
     UnknownCommandError,
 )
-from .models import CommandType, ExecutionPlan, RegisteredCommand, RunResult
+from .models import CommandType, ExecutionPlan, HistoryEntry, RegisteredCommand, RunResult
 
 __version__ = "0.0.1"
 
@@ -36,6 +36,7 @@ __all__ = [
     "RegisteredCommand",
     "RunResult",
     "ExecutionPlan",
+    "HistoryEntry",
     "CommandType",
     # Exceptions
     "TuError",

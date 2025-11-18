@@ -83,6 +83,14 @@ def show_command_cli(args: argparse.Namespace) -> int:
             print(f"Description: {cmd.description}")
         if cmd.tags:
             print(f"Tags: {', '.join(cmd.tags)}")
+        if cmd.aliases:
+            print(f"Aliases: {', '.join(cmd.aliases)}")
+        if cmd.depends_on:
+            print(f"Depends on: {', '.join(cmd.depends_on)}")
+        if cmd.env:
+            print(f"Environment: {cmd.env}")
+        if cmd.timeout:
+            print(f"Timeout: {cmd.timeout}s")
         print(f"Created: {cmd.created_at.isoformat()}")
         print(f"Updated: {cmd.updated_at.isoformat()}")
 
@@ -109,6 +117,14 @@ def register_command_cli(args: argparse.Namespace) -> int:
                 print("Registration cancelled.")
                 return 0
 
+        # Parse env variables
+        env_dict = {}
+        if args.env:
+            for pair in args.env.split(","):
+                if "=" in pair:
+                    key, value = pair.split("=", 1)
+                    env_dict[key.strip()] = value.strip()
+
         # Register the command
         allow_dot = args.force_dot_name or (name_to_use and is_dotted_name(name_to_use))
         cmd = api.register_command(
@@ -117,6 +133,10 @@ def register_command_cli(args: argparse.Namespace) -> int:
             type=args.type,
             description=args.description,
             tags=args.tags.split(",") if args.tags else None,
+            aliases=args.aliases.split(",") if args.aliases else None,
+            depends_on=args.depends_on.split(",") if args.depends_on else None,
+            env=env_dict if env_dict else None,
+            timeout=args.timeout,
             allow_dot_name=allow_dot
         )
 
@@ -167,52 +187,23 @@ def run_command_cli(args: argparse.Namespace) -> int:
         name = args.command
         cmd_args = args.args
 
-        # Resolve command
-        command, is_dotted = resolve_command(name)
+        # Get optional flags
+        dry_run = getattr(args, 'dry_run', False)
+        verbose = getattr(args, 'verbose', False)
+        timeout = getattr(args, 'timeout_override', None)
+        log_output = getattr(args, 'log', False)
 
-        if command is not None:
-            # Execute registered command
-            plan = ExecutionPlan(
-                command_type=command.type,
-                target=command.target,
-                args=cmd_args
-            )
+        # Use the API which handles all the complexity
+        result = api.run(
+            name,
+            args=cmd_args,
+            dry_run=dry_run,
+            verbose=verbose,
+            timeout_override=timeout,
+            log_output=log_output
+        )
 
-            # Apply global options if any
-            if args.subshell:
-                from .options import subshell_option
-                plan, _ = subshell_option(plan, [args.subshell])
-
-            result = execute_plan(plan, capture_output=False)
-            return result.returncode
-
-        elif is_dotted:
-            # Execute dotted name as Python module
-            plan = ExecutionPlan(
-                command_type="python_module",
-                target=name,
-                args=cmd_args
-            )
-
-            # Apply global options if any
-            if args.subshell:
-                from .options import subshell_option
-                plan, _ = subshell_option(plan, [args.subshell])
-
-            result = execute_plan(plan, capture_output=False)
-            return result.returncode
-
-        else:
-            # Not found - suggest alternatives
-            suggestions = suggest_commands(name)
-            if suggestions:
-                print_error(f"Unknown command: {name}")
-                print("\nDid you mean one of these?", file=sys.stderr)
-                for s in suggestions:
-                    print(f"  - {s}", file=sys.stderr)
-            else:
-                print_error(f"Unknown command: {name}")
-            return 1
+        return result.returncode
 
     except TuError as e:
         print_error(str(e))
@@ -352,6 +343,41 @@ def stats_cli(args: argparse.Namespace) -> int:
         return 1
 
 
+def history_cli(args: argparse.Namespace) -> int:
+    """Handle the --history command."""
+    try:
+        from .history import get_command_history, load_history
+
+        if args.history_name:
+            # Show history for specific command
+            entries = get_command_history(args.history_name, limit=args.history_limit or 20)
+            if not entries:
+                print(f"No history found for '{args.history_name}'")
+                return 0
+
+            print(f"\nHistory for '{args.history_name}':")
+        else:
+            # Show all history
+            entries = load_history(limit=args.history_limit or 20)
+            if not entries:
+                print("No history found")
+                return 0
+
+            print("\nRecent command history:")
+
+        for entry in entries:
+            args_str = " ".join(entry.args) if entry.args else ""
+            print(f"  {entry.executed_at.strftime('%Y-%m-%d %H:%M:%S')} - "
+                  f"{entry.command_name} {args_str} "
+                  f"(exit={entry.returncode}, {entry.duration:.2f}s)")
+
+        return 0
+
+    except Exception as e:
+        print_error(f"Failed to get history: {e}")
+        return 1
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser for tu CLI."""
     parser = argparse.ArgumentParser(
@@ -434,11 +460,57 @@ def create_parser() -> argparse.ArgumentParser:
         help="Allow registering dotted names without confirmation (with --register)"
     )
 
+    parser.add_argument(
+        "--aliases",
+        help="Comma-separated aliases (with --register)"
+    )
+
+    parser.add_argument(
+        "--depends-on",
+        help="Comma-separated list of commands this depends on (with --register)"
+    )
+
+    parser.add_argument(
+        "--env",
+        help="Comma-separated KEY=VALUE environment variables (with --register)"
+    )
+
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        help="Timeout in seconds (with --register or when running)"
+    )
+
     # Global execution options
     parser.add_argument(
         "--subshell",
         metavar="DIR",
         help="Run command in a subdirectory"
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would execute without running"
+    )
+
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed execution information"
+    )
+
+    parser.add_argument(
+        "--timeout-override",
+        type=int,
+        dest="timeout_override",
+        help="Override command's timeout setting"
+    )
+
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Write command output to log file"
     )
 
     # Completion support
@@ -498,6 +570,28 @@ def create_parser() -> argparse.ArgumentParser:
         "--stats",
         action="store_true",
         help="Show registry statistics"
+    )
+
+    parser.add_argument(
+        "--history",
+        nargs="?",
+        const="",
+        metavar="NAME",
+        dest="history_name",
+        help="Show command history - all if no name given"
+    )
+
+    parser.add_argument(
+        "--history-limit",
+        type=int,
+        default=20,
+        help="Number of history entries to show (default: 20)"
+    )
+
+    parser.add_argument(
+        "--interactive", "-i",
+        action="store_true",
+        help="Enter interactive REPL mode"
     )
 
     # Positional arguments for running commands
@@ -574,6 +668,13 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.stats:
         return stats_cli(args)
+
+    if args.history_name is not None:
+        return history_cli(args)
+
+    if args.interactive:
+        from .repl import repl
+        return repl()
 
     if args.register:
         # For --register, the command/target is in different places
