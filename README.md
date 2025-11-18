@@ -1,2 +1,3 @@
-# ic
-I Command -- quick access to your favorite scripts
+# tu
+
+Terminal Utils -- quick access to your favorite scripts
