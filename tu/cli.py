@@ -5,7 +5,7 @@ import sys
 from typing import Optional
 
 from . import api
-from .completion import get_completion_candidates, get_completion_script, install_completion
+from .completion import check_completion_hint, get_completion_candidates, get_completion_script, get_flag_candidates, install_completion
 from .exceptions import InvalidNameError, NameCollisionError, TuError, UnknownCommandError
 from .execute import execute_plan
 from .models import ExecutionPlan
@@ -230,6 +230,17 @@ def complete_cli(args: argparse.Namespace) -> int:
         return 0
 
 
+def complete_flags_cli(args: argparse.Namespace) -> int:
+    """Handle the --complete-flags command (for shell completion)."""
+    try:
+        candidates = get_flag_candidates(args.partial)
+        for candidate in candidates:
+            print(candidate)
+        return 0
+    except Exception:
+        return 0
+
+
 def completion_script_cli(args: argparse.Namespace) -> int:
     """Handle the --completion-script command."""
     try:
@@ -244,8 +255,8 @@ def completion_script_cli(args: argparse.Namespace) -> int:
 def install_completion_cli(args: argparse.Namespace) -> int:
     """Handle the --install-completion command."""
     try:
-        instructions = install_completion(args.shell)
-        print(instructions)
+        result = install_completion(args.shell)
+        print(result)
         return 0
     except ValueError as e:
         print_error(str(e))
@@ -522,6 +533,13 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--complete-flags",
+        metavar="PARTIAL",
+        dest="complete_flags_partial",
+        help="Complete flag names (for shell completion)"
+    )
+
+    parser.add_argument(
         "--completion-script",
         metavar="SHELL",
         choices=["bash", "zsh", "fish"],
@@ -649,6 +667,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.partial = args.complete_partial
         return complete_cli(args)
 
+    if args.complete_flags_partial is not None:
+        args.partial = args.complete_flags_partial
+        return complete_flags_cli(args)
+
     if args.completion_script:
         args.shell = args.completion_script
         return completion_script_cli(args)
@@ -684,6 +706,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             print_error("--register requires a target")
             return 1
         return register_command_cli(args)
+
+    # Show completion hint if not installed (at most once per day)
+    hint = check_completion_hint()
+    if hint:
+        print(hint, file=sys.stderr)
 
     # If no command specified, default to list
     if not args.command:
