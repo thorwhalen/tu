@@ -157,13 +157,17 @@ def test_cli_completion_script(capsys):
     assert "_tu_completion" in captured.out
 
 
-def test_cli_install_completion(capsys):
+def test_cli_install_completion(capsys, monkeypatch, tmp_path):
     """Test install completion instructions."""
+    # Avoid interactive prompt and write to a temp dir
+    monkeypatch.setattr("tu.completion._find_bash_completion_dir", lambda: tmp_path)
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
     exit_code = main(["--install-completion", "bash"])
     assert exit_code == 0
 
     captured = capsys.readouterr()
-    assert "bashrc" in captured.out.lower()
+    assert "installed" in captured.out.lower() or "completion" in captured.out.lower()
 
 
 def test_cli_register_with_tags(temp_registry, monkeypatch, capsys):

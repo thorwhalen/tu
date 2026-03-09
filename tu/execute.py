@@ -40,8 +40,16 @@ def execute_shell(
         CommandExecutionError: If execution fails.
     """
     # Build the full command
-    if " " in target:
-        # Shell command with arguments
+    has_placeholder = "{}" in target
+    if has_placeholder:
+        # Substitute args into placeholder(s)
+        args_str = " ".join(args)
+        cmd_str = target.replace("{}", args_str)
+        cmd_for_display = cmd_str
+        use_shell = True
+        cmd_for_exec = cmd_str
+    elif " " in target:
+        # Shell command with arguments appended
         cmd_str = f"{target} {' '.join(args)}" if args else target
         cmd_for_display = cmd_str
         use_shell = True

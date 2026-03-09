@@ -44,12 +44,14 @@ jobs:
           # Ruff will read configuration from pyproject.toml
 
       - name: Run Tests
-        uses: i2mint/wads/actions/run-tests@master
-        with:
-          root-dir: ${{ env.PROJECT_NAME }}
-          exclude: examples,scrap
-          coverage: true
-          pytest-args: -v --tb=short
+        run: |
+          pytest tests/ ${{ env.PROJECT_NAME }}/ \
+            -v --tb=short \
+            --doctest-modules \
+            --ignore=${{ env.PROJECT_NAME }}/examples \
+            --ignore=${{ env.PROJECT_NAME }}/scrap \
+            --cov=${{ env.PROJECT_NAME }} \
+            --cov-report=term-missing
 
   windows-validation:
     name: Windows Tests (Informational)
@@ -74,17 +76,18 @@ jobs:
       - name: Run tests
         id: test
         continue-on-error: true
-        run: pytest
+        run: pytest tests/ ${{ env.PROJECT_NAME }}/ --doctest-modules --ignore=${{ env.PROJECT_NAME }}/examples --ignore=${{ env.PROJECT_NAME }}/scrap -v --tb=short
 
       - name: Report test results
         if: always()
+        shell: bash
         run: |
           if [ "${{ steps.test.outcome }}" == "failure" ]; then
             echo "::warning::Windows tests failed but workflow continues"
-            echo "## ⚠️ Windows Tests Failed" >> $GITHUB_STEP_SUMMARY
+            echo "## Windows Tests Failed" >> $GITHUB_STEP_SUMMARY
             echo "Tests failed on Windows but this is informational only." >> $GITHUB_STEP_SUMMARY
           else
-            echo "## ✅ Windows Tests Passed" >> $GITHUB_STEP_SUMMARY
+            echo "## Windows Tests Passed" >> $GITHUB_STEP_SUMMARY
           fi
 
   publish:

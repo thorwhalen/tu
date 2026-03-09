@@ -105,6 +105,25 @@ tu --register --name deploy --type shell "./scripts/deploy.sh"
 tu deploy
 ```
 
+#### Argument Placeholders
+
+By default, arguments are appended to the command. Use `{}` in the target to control
+where arguments are inserted:
+
+```bash
+# Without placeholder: args are appended
+tu --register --name greet "echo hello"
+tu greet world          # runs: echo hello world
+
+# With placeholder: args replace {}
+tu --register --name say 'echo "said: {}"'
+tu say hi there         # runs: echo "said: hi there"
+
+# Useful for wrapping commands that need args in a specific position
+tu --register --name ai 'aichat -e "{}"'
+tu ai "what is 2+2"    # runs: aichat -e "what is 2+2"
+```
+
 ### Python Modules
 
 Execute Python modules using `python -m`:
@@ -202,44 +221,23 @@ This is equivalent to:
 
 ## Shell Completion
 
-Enable tab completion for your shell:
-
-### Bash
+`tu` supports tab completion for command names and flags. Install it with one command:
 
 ```bash
-tu --install-completion bash
+tu --install-completion zsh   # or bash, fish
 ```
 
-Add to your `~/.bashrc`:
+This auto-detects the right location (e.g. oh-my-zsh completions dir) and asks for
+confirmation before writing. Then restart your shell.
+
+For arrow-key menu navigation through completions, add to your `~/.zshrc`:
 
 ```bash
-eval "$(tu --completion-script bash)"
+zstyle ':completion:*' menu select
 ```
 
-### Zsh
-
-```bash
-tu --install-completion zsh
-```
-
-Save the completion script:
-
-```bash
-tu --completion-script zsh > ~/.zsh/completion/_tu
-```
-
-Add to your `~/.zshrc`:
-
-```bash
-fpath=(~/.zsh/completion $fpath)
-autoload -Uz compinit && compinit
-```
-
-### Fish
-
-```bash
-tu --completion-script fish > ~/.config/fish/completions/tu.fish
-```
+You can also print the raw completion script with `tu --completion-script zsh` if you
+prefer to install it manually.
 
 ## Python API
 
