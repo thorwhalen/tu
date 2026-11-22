@@ -54,5 +54,14 @@ convention = "google"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-testpaths = ["tests"]
+testpaths = ["tests", "tu"]
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
+
+[tool.wads.ci]
+project_name = "tu"
+
+[tool.wads.ci.install]
+extras = "dev"
+
+[tool.wads.ci.testing]
+python_versions = ["3.10", "3.12"]

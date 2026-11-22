@@ -1,174 +1,56 @@
-name: Continuous Integration (Modern)
+# wads CI — calls the reusable workflow hosted in i2mint/wads.
+#
+# All configuration comes from this repo's pyproject.toml [tool.wads.ci.*].
+# To customize the workflow itself (rare), replace this file with the
+# full inline template `wads/data/github_ci_uv.yml` from i2mint/wads.
+#
+# Pinning: `@master` floats with wads. If you need a stable job graph for
+# a release-sensitive repo, change `@master` to a wads tag (e.g. `@0.2.15`;
+# tags have no `v` prefix). That freezes this workflow, not the actions it
+# calls, which still run at `@master`.
+# CI failure does not block a published release — it blocks the publish
+# step itself — so floating master is generally safe.
+#
+# Permissions: GitHub validates that the caller grants AT LEAST the
+# permissions any job in the called workflow requests — at workflow-parse
+# time, not at run-time, even if the job would be skipped via `if:`.
+# The reusable workflow needs:
+#   contents: write   for the publish job's version-bump push-back
+#                     and for the github-pages job's gh-pages branch push
+#   pages: write      for the github-pages job's REST API Pages config
+# Both default to `write` on org-account GITHUB_TOKEN and need to be
+# granted explicitly on personal-account callers (where the default is
+# read-only). No `id-token: write` needed — the publish-github-pages
+# action uses peaceiris/actions-gh-pages (branch-based) + REST API,
+# not the OIDC `actions/deploy-pages` flow.
+name: Continuous Integration
 on: [push, pull_request]
-
-env:
-  PROJECT_NAME: tu
-
 jobs:
-  validation:
-    name: Validation
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.12"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install Dependencies
-        uses: i2mint/wads/actions/install-deps@master
-        with:
-          dependency-files: pyproject.toml
-          extras: dev,test
-          # Fallback for projects still using setup.cfg:
-          # dependency-files: setup.cfg
-          # ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # Uncomment for private dependencies
-
-      - name: Format Source Code
-        uses: i2mint/wads/actions/ruff-format@master
-        with:
-          line-length: 88
-          target-path: .
-
-      - name: Lint Validation
-        uses: i2mint/wads/actions/ruff-lint@master
-        with:
-          root-dir: ${{ env.PROJECT_NAME }}
-          output-format: github
-          # Ruff will read configuration from pyproject.toml
-
-      - name: Run Tests
-        run: |
-          pytest tests/ ${{ env.PROJECT_NAME }}/ \
-            -v --tb=short \
-            --doctest-modules \
-            --ignore=${{ env.PROJECT_NAME }}/examples \
-            --ignore=${{ env.PROJECT_NAME }}/scrap \
-            --cov=${{ env.PROJECT_NAME }} \
-            --cov-report=term-missing
-
-  windows-validation:
-    name: Windows Tests (Informational)
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: windows-latest
-    continue-on-error: true  # Don't fail the entire workflow if Windows tests fail
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Dependencies
-        uses: i2mint/wads/actions/install-deps@master
-        with:
-          dependency-files: pyproject.toml
-          extras: dev,test
-
-      - name: Run tests
-        id: test
-        continue-on-error: true
-        run: pytest tests/ ${{ env.PROJECT_NAME }}/ --doctest-modules --ignore=${{ env.PROJECT_NAME }}/examples --ignore=${{ env.PROJECT_NAME }}/scrap -v --tb=short
-
-      - name: Report test results
-        if: always()
-        shell: bash
-        run: |
-          if [ "${{ steps.test.outcome }}" == "failure" ]; then
-            echo "::warning::Windows tests failed but workflow continues"
-            echo "## Windows Tests Failed" >> $GITHUB_STEP_SUMMARY
-            echo "Tests failed on Windows but this is informational only." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## Windows Tests Passed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  publish:
-    name: Publish
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')"
-    needs: validation
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Format Source Code
-        uses: i2mint/wads/actions/ruff-format@master
-
-      - name: Update Version Number
-        id: version
-        uses: i2mint/isee/actions/bump-version-number@master
-
-      - name: Build Distribution
-        uses: i2mint/wads/actions/build-dist@master
-        with:
-          sdist: true
-          wheel: true
-        # Uncomment for private dependencies:
-        # with:
-        #   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Publish to PyPI
-        uses: i2mint/wads/actions/pypi-upload@master
-        with:
-          pypi-username: ${{ secrets.PYPI_USERNAME }}
-          pypi-password: ${{ secrets.PYPI_PASSWORD }}
-          skip-existing: false
-
-      - name: Track Code Metrics
-        uses: i2mint/umpyre/actions/track-metrics@master
-        continue-on-error: true  # Don't fail CI if metrics collection fails
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          config-path: .github/umpyre-config.yml  # Optional: defaults to .umpyre.yml
-
-      - name: Commit Changes
-        uses: i2mint/wads/actions/git-commit@master
-        with:
-          commit-message: "**CI** Formatted code + Updated version to ${{ env.VERSION }} [skip ci]"
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          push: true
-
-      - name: Tag Repository
-        uses: i2mint/wads/actions/git-tag@master
-        with:
-          tag: ${{ env.VERSION }}
-          message: "Release version ${{ env.VERSION }}"
-          push: true
-
-
-  github-pages:
-    name: Publish GitHub Pages
-
+  ci:
+    uses: i2mint/wads/.github/workflows/uv-ci.yml@master
     permissions:
       contents: write
       pages: write
-      id-token: write
-
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
-    needs: publish
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: i2mint/epythet/actions/publish-github-pages@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ignore: "tests/,scrap/,examples/"
+    # Transport (named): passes ONLY the secrets listed below — PYPI_PASSWORD
+    # (for the publish job) plus the secret behind each env var declared in
+    # [tool.wads.ci.env]. `wads-secrets add VAR_NAME` declares a var and adds
+    # its secret here. Every listed name must be declared by the reusable
+    # workflow (the superset in wads/ci_secrets.py) or GitHub rejects this
+    # workflow at parse time; a missing name is a one-line addition there.
+    # (Cross-owner `secrets: inherit` does not propagate secrets, so it
+    # cannot replace this list.)
+    #
+    # Opt-in alternative: `wads-migrate ci-to-stub --transport json` passes
+    # this repo's WHOLE secrets context — every secret it can read, including
+    # org-level ones — as one WADS_CI_SECRETS_JSON secret. GitHub's
+    # malicious-workflow scanner may hold runs that do that: `action_required`,
+    # zero jobs, no log (i2mint/wads#74, #101).
+    #
+    # *Which* of these become job env vars — and which are required — is
+    # driven entirely by [tool.wads.ci.env] in pyproject.toml; nothing is
+    # exported unless declared there. Non-sensitive values don't need a secret:
+    # use [tool.wads.ci.env].defaults (committed literals) or a repository
+    # *variable* (`gh variable set NAME`) — declared names fall back to
+    # repo variables automatically.
+    secrets:
+      PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
