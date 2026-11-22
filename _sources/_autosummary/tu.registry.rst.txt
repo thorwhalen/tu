@@ -1,0 +1,21 @@
+tu.registry
+===========
+
+.. automodule:: tu.registry
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      add_command
+      get_command
+      get_project_registry_path
+      get_registry_path
+      list_commands
+      load_layered_registry
+      load_registry
+      remove_command
+      rename_command
+      save_registry
+   

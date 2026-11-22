@@ -1,0 +1,17 @@
+tu.completion
+=============
+
+.. automodule:: tu.completion
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      check_completion_hint
+      get_completion_candidates
+      get_completion_script
+      get_flag_candidates
+      install_completion
+      is_completion_installed
+   

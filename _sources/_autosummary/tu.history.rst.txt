@@ -1,0 +1,17 @@
+tu.history
+==========
+
+.. automodule:: tu.history
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      add_history_entry
+      clear_history
+      get_command_history
+      get_history_path
+      load_history
+      save_history
+   

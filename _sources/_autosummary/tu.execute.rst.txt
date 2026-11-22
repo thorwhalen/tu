@@ -1,0 +1,15 @@
+tu.execute
+==========
+
+.. automodule:: tu.execute
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      execute_plan
+      execute_python_callable
+      execute_python_module
+      execute_shell
+   

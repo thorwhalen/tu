@@ -1,0 +1,17 @@
+tu.api
+======
+
+.. automodule:: tu.api
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      get_command_info
+      list_commands
+      register_command
+      rename_command
+      run
+      unregister_command
+   

@@ -1,0 +1,13 @@
+tu.options
+==========
+
+.. automodule:: tu.options
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      apply_global_options
+      subshell_option
+   

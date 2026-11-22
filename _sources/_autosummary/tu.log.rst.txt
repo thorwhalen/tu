@@ -1,0 +1,15 @@
+tu.log
+======
+
+.. automodule:: tu.log
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      clear_old_logs
+      get_log_directory
+      get_recent_logs
+      write_log
+   

@@ -1,0 +1,57 @@
+﻿tu
+==
+
+.. automodule:: tu
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      list_commands
+      get_command_info
+      register_command
+      unregister_command
+      rename_command
+      run
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      RegisteredCommand
+      RunResult
+      ExecutionPlan
+      HistoryEntry
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+   
+      TuError
+      UnknownCommandError
+      NameCollisionError
+      RegistryCorruptedError
+      InvalidCommandTypeError
+      InvalidNameError
+      CommandExecutionError
+   
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   api
+   cli
+   completion
+   exceptions
+   execute
+   history
+   log
+   models
+   options
+   registry
+   repl
+   resolve
+   utils

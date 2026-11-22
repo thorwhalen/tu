@@ -1,0 +1,23 @@
+tu.repl
+=======
+
+.. automodule:: tu.repl
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      handle_history
+      handle_list
+      handle_register
+      handle_rename
+      handle_run
+      handle_show
+      handle_stats
+      handle_unregister
+      handle_validate
+      print_help
+      print_welcome
+      repl
+   

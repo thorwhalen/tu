@@ -1,0 +1,18 @@
+tu.exceptions
+=============
+
+.. automodule:: tu.exceptions
+
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+   
+      CommandExecutionError
+      InvalidCommandTypeError
+      InvalidNameError
+      NameCollisionError
+      RegistryCorruptedError
+      TuError
+      UnknownCommandError
+   

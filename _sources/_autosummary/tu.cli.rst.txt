@@ -1,0 +1,29 @@
+tu.cli
+======
+
+.. automodule:: tu.cli
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      complete_cli
+      complete_flags_cli
+      completion_script_cli
+      create_parser
+      export_registry_cli
+      history_cli
+      import_registry_cli
+      install_completion_cli
+      list_commands_cli
+      main
+      print_error
+      register_command_cli
+      rename_command_cli
+      run_command_cli
+      show_command_cli
+      stats_cli
+      unregister_command_cli
+      validate_cli
+   

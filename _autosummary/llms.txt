@@ -1,0 +1,25 @@
+# tu
+
+> Terminal Utils - unified entry point for scripts and commands
+
+
+## Pages in this subsection
+
+- [tu](tu.html.md): tu - Terminal Utils: Quick access to your favorite scripts.
+- [tu.api](tu.api.html.md): Python API for tu package.
+- [tu.cli](tu.cli.html.md): Command-line interface for tu.
+- [tu.completion](tu.completion.html.md): Shell completion support for tu.
+- [tu.exceptions](tu.exceptions.html.md): Custom exceptions for the tu package.
+- [tu.execute](tu.execute.html.md): Command execution for tu.
+- [tu.history](tu.history.html.md): Command execution history tracking.
+- [tu.log](tu.log.html.md): Command output logging for tu.
+- [tu.models](tu.models.html.md): Data models for the tu package.
+- [tu.options](tu.options.html.md): Global options framework for tu.
+- [tu.registry](tu.registry.html.md): Registry management for tu commands.
+- [tu.repl](tu.repl.html.md): Interactive REPL mode for tu.
+- [tu.resolve](tu.resolve.html.md): Command name resolution for tu.
+- [tu.utils](tu.utils.html.md): Utility functions for tu.
+
+## Optional
+
+- [Top-level llms.txt](../llms.txt): Complete documentation index.

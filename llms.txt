@@ -1,0 +1,32 @@
+# tu
+
+> Terminal Utils - unified entry point for scripts and commands
+
+
+## Pages
+
+- [tu - Terminal Utils](index.html.md): &#42;&#42;Quick access to your favorite scripts and commands&#42;&#42;
+- [API reference](api.html.md): | &#96;tu&#96;   | tu - Terminal Utils: Quick access to your favorite scripts.   |
+- [tu](_autosummary/tu.html.md): tu - Terminal Utils: Quick access to your favorite scripts.
+- [tu.api](_autosummary/tu.api.html.md): Python API for tu package.
+- [tu.cli](_autosummary/tu.cli.html.md): Command-line interface for tu.
+- [tu.completion](_autosummary/tu.completion.html.md): Shell completion support for tu.
+- [tu.exceptions](_autosummary/tu.exceptions.html.md): Custom exceptions for the tu package.
+- [tu.execute](_autosummary/tu.execute.html.md): Command execution for tu.
+- [tu.history](_autosummary/tu.history.html.md): Command execution history tracking.
+- [tu.log](_autosummary/tu.log.html.md): Command output logging for tu.
+- [tu.models](_autosummary/tu.models.html.md): Data models for the tu package.
+- [tu.options](_autosummary/tu.options.html.md): Global options framework for tu.
+- [tu.registry](_autosummary/tu.registry.html.md): Registry management for tu commands.
+- [tu.repl](_autosummary/tu.repl.html.md): Interactive REPL mode for tu.
+- [tu.resolve](_autosummary/tu.resolve.html.md): Command name resolution for tu.
+- [tu.utils](_autosummary/tu.utils.html.md): Utility functions for tu.
+- [About this build](about-this-build.html.md): This documentation was built on &#42;&#42;2026-11-22 19:05 UTC&#42;&#42; from commit &lt;a href="https://github.com/tho...
+
+## Optional
+
+- [tu.md](tu.md): Complete documentation in a single file.
+
+## Build
+
+- [build_info.json](build_info.json): build provenance (commit, version, tool versions, whether the docs match the package)

@@ -1,0 +1,17 @@
+tu.resolve
+==========
+
+.. automodule:: tu.resolve
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      infer_command_type
+      infer_default_name
+      is_dotted_name
+      resolve_command
+      suggest_commands
+      validate_name
+   
